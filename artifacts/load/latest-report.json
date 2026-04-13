@@ -1,0 +1,72 @@
+{
+  "status": "PASS",
+  "profiles": [
+    {
+      "profile": "normal",
+      "requests": 1411,
+      "failures": 0,
+      "failure_rate_pct": 0.0,
+      "req_per_sec": 100.7133,
+      "avg_ms": 28.2752,
+      "p95_ms": 54.0,
+      "thresholds": {
+        "max_failure_pct": 1.0,
+        "max_p95_ms": 800.0
+      }
+    },
+    {
+      "profile": "slow",
+      "requests": 110,
+      "failures": 0,
+      "failure_rate_pct": 0.0,
+      "req_per_sec": 8.084,
+      "avg_ms": 1519.3454,
+      "p95_ms": 1500.0,
+      "thresholds": {
+        "max_failure_pct": 5.0,
+        "max_p95_ms": 3000.0
+      }
+    },
+    {
+      "profile": "failing",
+      "requests": 591,
+      "failures": 0,
+      "failure_rate_pct": 0.0,
+      "req_per_sec": 53.7217,
+      "avg_ms": 17.9332,
+      "p95_ms": 13.0,
+      "thresholds": {
+        "max_failure_pct": 1.0,
+        "max_p95_ms": 500.0
+      }
+    },
+    {
+      "profile": "failover",
+      "requests": 1652,
+      "failures": 0,
+      "failure_rate_pct": 0.0,
+      "req_per_sec": 86.855,
+      "avg_ms": 65.0407,
+      "p95_ms": 110.0,
+      "thresholds": {
+        "max_failure_pct": 3.0,
+        "max_p95_ms": 1200.0
+      }
+    },
+    {
+      "profile": "spike",
+      "requests": 8912,
+      "failures": 0,
+      "failure_rate_pct": 0.0,
+      "req_per_sec": 74.1013,
+      "avg_ms": 650.1485,
+      "p95_ms": 2400.0,
+      "thresholds": {
+        "max_failure_pct": 5.0,
+        "max_p95_ms": 3000.0
+      }
+    }
+  ],
+  "violations": [],
+  "generated_at_utc": "2026-04-13T00:20:54.453951+00:00"
+}

@@ -1,0 +1,21 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.10
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: ty-check
+        name: ty-check
+        entry: uv run ty check
+        language: system
+        pass_filenames: false
+
+      - id: pytest-smoke
+        name: pytest-smoke
+        entry: uv run pytest tests/smoke -q
+        language: system
+        pass_filenames: false

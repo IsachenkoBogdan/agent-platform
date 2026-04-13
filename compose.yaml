@@ -1,0 +1,220 @@
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    container_name: agent-platform-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      OTEL_ENDPOINT: "http://otel-collector:4318/v1/traces"
+      MLFLOW_TRACKING_URI: "http://mlflow:5000"
+      AUTH_MODE: "jwt_only"
+      JWT_SECRET: "${JWT_SECRET:-dev-jwt-secret-for-local-only}"
+      JWT_ISSUER: "${JWT_ISSUER:-agent-platform}"
+      JWT_AUDIENCE: "${JWT_AUDIENCE:-agent-platform}"
+      AUTH_JWT_ISSUE_TOKENS_CSV: "${AUTH_JWT_ISSUE_TOKENS_CSV:-issuer-token}"
+      GATEWAY_SUPPORTED_MODELS_CSV: "gpt-4o-mini,deepseek-chat"
+      GATEWAY_PROVIDERS_JSON: >-
+        [
+          {"provider_id":"mock-a","provider_name":"Mock Provider A","base_url":"http://mock-provider-a:9101/v1","supported_models":["gpt-4o-mini","deepseek-chat"],"priority":100,"enabled":true},
+          {"provider_id":"mock-b","provider_name":"Mock Provider B","base_url":"http://mock-provider-b:9102/v1","supported_models":["gpt-4o-mini","deepseek-chat"],"priority":200,"enabled":true}
+        ]
+    depends_on:
+      registry:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+      mlflow:
+        condition: service_started
+      mock-provider-a:
+        condition: service_healthy
+      mock-provider-b:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz').read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 8
+
+  registry:
+    build:
+      context: .
+      dockerfile: services/registry/Dockerfile
+    container_name: agent-platform-registry
+    ports:
+      - "8001:8001"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      AUTH_MODE: "jwt_only"
+      JWT_SECRET: "${JWT_SECRET:-dev-jwt-secret-for-local-only}"
+      JWT_ISSUER: "${JWT_ISSUER:-agent-platform}"
+      JWT_AUDIENCE: "${JWT_AUDIENCE:-agent-platform}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/healthz').read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 8
+
+  demo-agent:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    container_name: agent-platform-demo-agent
+    command:
+      - uvicorn
+      - services.demo_agent.app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8010"
+    ports:
+      - "8010:8010"
+    environment:
+      PYTHONUNBUFFERED: "1"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8010/healthz').read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 8
+
+  airline-agent:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    container_name: agent-platform-airline-agent
+    command:
+      - uvicorn
+      - services.airline_agent.app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8030"
+    ports:
+      - "8030:8030"
+    environment:
+      PYTHONUNBUFFERED: "1"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8030/healthz').read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 8
+
+  mock-provider-a:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    container_name: agent-platform-mock-provider-a
+    command:
+      - uvicorn
+      - services.mock_provider.app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "9101"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      MOCK_PROVIDER_ID: "mock-a"
+      MOCK_PROVIDER_BEHAVIOR: "stable"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9101/healthz').read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 8
+
+  mock-provider-b:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    container_name: agent-platform-mock-provider-b
+    command:
+      - uvicorn
+      - services.mock_provider.app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "9102"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      MOCK_PROVIDER_ID: "mock-b"
+      MOCK_PROVIDER_BEHAVIOR: "flaky"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9102/healthz').read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 8
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.126.0
+    container_name: agent-platform-otel
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./infra/otel/collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4318:4318"
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: agent-platform-mlflow
+    command:
+      - mlflow
+      - server
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+      - --backend-store-uri
+      - sqlite:////mlflow/mlflow.db
+      - --default-artifact-root
+      - /mlflow/artifacts
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/').read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: agent-platform-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      gateway:
+        condition: service_healthy
+      registry:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: agent-platform-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: "admin"
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+      GF_USERS_DEFAULT_THEME: "light"
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  grafana_data:
+  mlflow_data:
